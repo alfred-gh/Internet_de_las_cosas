@@ -1,0 +1,94 @@
+#include <LiquidCrystal.h>
+
+// Configuración LCD (RS, E, D4, D5, D6, D7)
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+
+// Pines
+int sensor_temp = A0;
+int sensor_gas = A5;
+int ledv_gas = 8;
+int ledr_gas = 9;
+int alarma = 10;
+int ledv_temp = 11;
+int leda_temp = 12;
+int ledr_temp = 13;
+
+// Variables
+float temperatura;
+int humo;
+
+void setup() {
+  lcd.begin(16, 2);
+  pinMode(ledv_gas, OUTPUT);
+  pinMode(ledr_gas, OUTPUT);
+  pinMode(ledv_temp, OUTPUT);
+  pinMode(leda_temp, OUTPUT);
+  pinMode(ledr_temp, OUTPUT);
+  pinMode(alarma, OUTPUT);
+  digitalWrite(alarma, LOW);
+}
+
+void loop() {
+  // Leer sensores
+  int lecturaTemp = analogRead(sensor_temp);
+  temperatura = (5.0 / 1024.0) * lecturaTemp * 100 - 50;
+  humo = analogRead(sensor_gas);
+
+  // Mostrar temperatura en la primera línea
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temperatura, 1);
+  lcd.print((char)223);
+  lcd.print("C    ");
+
+  // --- Manejo de INCENDIO (temperatura >= 70°C) ---
+  if (temperatura >= 70.0) {
+    digitalWrite(ledr_temp, HIGH);  // LED rojo temperatura
+    digitalWrite(leda_temp, LOW);
+    digitalWrite(ledv_temp, LOW);
+    lcd.setCursor(0, 1);
+    lcd.print("INCENDIO!      ");  // Mensaje de incendio
+    tone(alarma, 1500);             // Alarma continua
+    delay(500);                     // Pequeña pausa para evitar parpadeo
+    return;                         // Prioridad absoluta (ignora el gas)
+  }
+
+  // --- Manejo de GAS (humo >= 950) ---
+  else if (humo >= 950) {
+    digitalWrite(ledr_gas, HIGH);
+    digitalWrite(ledv_gas, LOW);
+    lcd.setCursor(0, 1);
+    lcd.print("HUMO DETECTADO!");
+    tone(alarma, 1500);             // Alarma continua
+  }
+
+  // --- Modo seguro (sin incendio ni humo) ---
+  else {
+    digitalWrite(ledr_gas, LOW);
+    digitalWrite(ledv_gas, HIGH);
+    noTone(alarma);                 // Apagar alarma si no hay peligro
+
+    // Manejo de temperatura normal
+    if (temperatura < 40.0) {
+      digitalWrite(ledv_temp, HIGH);
+      digitalWrite(leda_temp, LOW);
+      digitalWrite(ledr_temp, LOW);
+      lcd.setCursor(0, 1);
+      lcd.print("Estado: SEGURO  ");
+    } 
+    else if (temperatura < 70.0) {
+      digitalWrite(ledv_temp, LOW);
+      digitalWrite(leda_temp, HIGH);
+      digitalWrite(ledr_temp, LOW);
+      lcd.setCursor(0, 1);
+      lcd.print("TEMP ALTA!      ");
+      // Alerta intermitente
+      tone(alarma, 1000);
+      delay(200);
+      noTone(alarma);
+      delay(300);
+    }
+  }
+
+  delay(100); // Pequeño retardo para estabilidad
+}
